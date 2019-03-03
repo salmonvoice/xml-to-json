@@ -1,5 +1,9 @@
 package software.engineering.task.controller;
 
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -35,6 +39,8 @@ import software.engineering.task.pojo.RateAndDate;
 import software.engineering.task.pojo.Rates;
 
 import javax.net.ssl.SSLContext;
+import javax.servlet.http.HttpServletResponse;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
@@ -46,6 +52,7 @@ import java.time.temporal.TemporalUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * This class waits and processes all incoming requests
@@ -85,12 +92,54 @@ public class MainController {
         }
     }
 
+    @GetMapping("bestDaysPdf")
+    public void generatePdf(@RequestParam("startDate") String startDate, @RequestParam("endDate") String endDate, HttpServletResponse response) throws DocumentException, IOException {
+        Map<String, BuySell> bestbuySell = getStringBuySellMap(startDate, endDate);
+
+        Document document = new Document();
+        response.addHeader("Content-Type", "application/pdf");
+        PdfWriter.getInstance(document, response.getOutputStream());
+
+        document.open();
+
+        PdfPTable table = new PdfPTable(3);
+        addTableHeader(table);
+        for (Map.Entry<String, BuySell> entry : bestbuySell.entrySet()) {
+            table.addCell(entry.getKey());
+            table.addCell(dateTimeFormatter.format(entry.getValue().getBuyDate()));
+            table.addCell(dateTimeFormatter.format(entry.getValue().getSellDate()));
+        }
+
+        Paragraph paragraph2 = new Paragraph();
+        paragraph2.add(table);
+        document.add(paragraph2);
+        document.close();
+    }
+
+    private void addTableHeader(PdfPTable table) {
+        Stream.of("Currency", "Buy date", "Cell date")
+                .forEach(columnTitle -> {
+                    PdfPCell header = new PdfPCell();
+                    header.setBackgroundColor(BaseColor.LIGHT_GRAY);
+                    header.setBorderWidth(2);
+                    header.setPhrase(new Phrase(columnTitle));
+                    table.addCell(header);
+                });
+    }
+
+
 
     @GetMapping(value = "bestDays", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, BuySell>> bestDaysToBuyAndSell(@RequestParam("startDate") String startDate, @RequestParam("endDate") String endDate) {
         System.out.println("startDate = " + startDate);
         System.out.println("endDate = " + endDate);
 
+        Map<String, BuySell> bestbuySell = getStringBuySellMap(startDate, endDate);
+
+        return new ResponseEntity<>(bestbuySell, HttpStatus.OK);
+    }
+
+    private Map<String, BuySell> getStringBuySellMap(@RequestParam("startDate") String startDate, @RequestParam("endDate") String endDate) {
         LocalDate date1 = dateTimeFormatter.parse(startDate, LocalDate::from);
         LocalDate date2 = dateTimeFormatter.parse(endDate, LocalDate::from);
 
@@ -130,8 +179,7 @@ public class MainController {
         for (Map.Entry<String, RateAndDate> entry : ratesMap.entrySet()) {
             bestbuySell.put(entry.getKey(), new BuySell(entry.getValue().minDate, entry.getValue().maxDate, entry.getKey()));
         }
-
-        return new ResponseEntity<>(bestbuySell, HttpStatus.OK);
+        return bestbuySell;
     }
 
     private ExchangeRates getRates(LocalDate date){

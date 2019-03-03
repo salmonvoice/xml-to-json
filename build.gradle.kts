@@ -22,6 +22,8 @@ dependencies {
     compile("org.cryptacular:cryptacular:1.2.3")
     compile("redis.clients:jedis:2.9.0")
     compile("org.springframework.data:spring-data-redis:2.0.3.RELEASE")
+    compile("com.itextpdf:itextpdf:5.5.10")
+    compile("org.apache.pdfbox:pdfbox:2.0.4")
     testCompile("junit", "junit", "4.12")
 }
 
