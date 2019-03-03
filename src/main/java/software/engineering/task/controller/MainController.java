@@ -58,7 +58,7 @@ public class MainController {
      * WARN - free api key works only for 1000 usages
      */
     private static final String API_KEY = "fdc02ed89821849c87fb80b6377f308a";
-    private static final String BASE_CURRENCY = "RUB";
+    private static final String BASE_CURRENCY = "EUR";
 
     @Autowired
     private RestTemplate restTemplate;
@@ -103,27 +103,19 @@ public class MainController {
         LocalDate curDate = date1;
         Map<String, RateAndDate> ratesMap = new HashMap<>();
         while (!curDate.isAfter(date2)) {
-            ExchangeRates rates = null;
-            try {
-                rates = getRates(curDate);
-            } catch (KeyStoreException e) {
-                e.printStackTrace();
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-            } catch (KeyManagementException e) {
-                e.printStackTrace();
-            }
+            ExchangeRates rates = getRates(curDate);
+
             Map<String, Double> rates1 = rates.getRates();
 
             for (String currency : rates1.keySet()) {
                 ratesMap.putIfAbsent(currency, new RateAndDate());
                 RateAndDate rateAndDate = ratesMap.get(currency);
                 Double rateVal = rates1.get(currency);
-                if (rateVal < rateAndDate.min) {
+                if (rateAndDate.min == 0 || rateVal < rateAndDate.min) {
                     rateAndDate.min = rateVal;
                     rateAndDate.minDate = curDate;
                 }
-                if (rateVal > rateAndDate.max) {
+                if (rateAndDate.max == 0 || rateVal > rateAndDate.max) {
                     rateAndDate.max = rateVal;
                     rateAndDate.maxDate = curDate;
                 }
@@ -136,73 +128,32 @@ public class MainController {
 
 
         for (Map.Entry<String, RateAndDate> entry : ratesMap.entrySet()) {
-            bestbuySell.put(entry.getKey(), new BuySell(entry.getValue().minDate, entry.getValue().maxDate));
+            bestbuySell.put(entry.getKey(), new BuySell(entry.getValue().minDate, entry.getValue().maxDate, entry.getKey()));
         }
 
         return new ResponseEntity<>(bestbuySell, HttpStatus.OK);
     }
 
-    private ExchangeRates getRates(LocalDate date) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
-//        Jedis jedis = new Jedis("localhost");
-//        jedis.set("foo", "bar");
-//        String value = jedis.get("foo");
-
+    private ExchangeRates getRates(LocalDate date){
         String dateTxt = dateTimeFormatter.format(date);
 
         Optional<ExchangeRates> byDate = exchangeRatesRepository.findById(dateTxt);
         if (byDate.isPresent()) {
             return byDate.get();
         }
-
-
-       /* SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(null,
-                new TrustSelfSignedStrategy()).build();
-        // Allow TLSv1 protocol only, use NoopHostnameVerifier to trust self-singed cert
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext,
-                new String[] { "TLSv1.1" }, null, new NoopHostnameVerifier());
-
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(sslsf)
-                .setSSLHostnameVerifier(new NoopHostnameVerifier())
-                .build();
-        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setHttpClient(httpClient);
-        RestTemplate restTemplate = new RestTemplate(requestFactory);*/
-
-
-        /*SSLContextBuilder builder = new SSLContextBuilder();
-        builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
-                builder.build());
-        CloseableHttpClient httpclient = HttpClients.custom().setSSLSocketFactory(
-                sslsf).build();
-
-        HttpGet httpGet = new HttpGet("https://api.exchangeratesapi.io/2019-02-02?base=RUB");
-        CloseableHttpResponse response = null;
-        try {
-            response = httpclient.execute(httpGet);
-
-            try {
-                System.out.println(response.getStatusLine());
-                HttpEntity entity = response.getEntity();
-                EntityUtils.consume(entity);
-            } finally {
-                response.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
-        ResponseEntity<Rates> exchange = restTemplate.exchange("https://api.exchangeratesapi.io/{date}?base={base}", HttpMethod.GET, null, Rates.class,
-                dateTxt, BASE_CURRENCY);
+//        String url = "https://api.exchangeratesapi.io/{date}?base={base}";  //not working inaccessible
+        String url = "http://data.fixer.io/api/{date}?access_key={key}&base={base}";
+        ResponseEntity<Rates> exchange = restTemplate.exchange(url, HttpMethod.GET, null, Rates.class,
+                dateTxt, API_KEY, BASE_CURRENCY);
         Rates body = exchange.getBody();
         System.out.println("rates = " + body);
 
         ExchangeRates exchangeRates = new ExchangeRates();
         exchangeRates.setDate(dateTxt);
-        exchangeRates.setBaseCurrency("RUB");
+        exchangeRates.setBaseCurrency(BASE_CURRENCY);
         Map<String, Double> rr = new HashMap<>();
         rr.put("usd", body.rates.USD);
-        rr.put("eur", body.rates.EUR);
+        rr.put("eur", body.rates.RUB);// using RUB cost instead of EUR because RUB is restricted as base currency of fixer.io
         exchangeRates.setRates(rr);
         exchangeRatesRepository.save(exchangeRates);
         return exchangeRates;

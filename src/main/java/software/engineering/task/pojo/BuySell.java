@@ -8,9 +8,10 @@ public class BuySell {
     private LocalDate sellDate;
     private String currency;
 
-    public BuySell(LocalDate buyDate, LocalDate sellDate) {
+    public BuySell(LocalDate buyDate, LocalDate sellDate, String currency) {
         this.buyDate = buyDate;
         this.sellDate = sellDate;
+        this.currency = currency;
     }
 
     public LocalDate getBuyDate() {

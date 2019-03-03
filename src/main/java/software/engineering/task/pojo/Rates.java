@@ -5,12 +5,14 @@ public class Rates {
     public static class Rates2 {
         public double USD;
         public double EUR;
+        public double RUB;
 
         @Override
         public String toString() {
             return "{" +
                     "USD='" + USD + '\'' +
                     ", EUR='" + EUR + '\'' +
+                    ", RUB='" + RUB + '\'' +
                     '}';
         }
     }
